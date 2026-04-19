@@ -1,3 +1,4 @@
+//import { emit } from "emit";
 import { Server, Socket } from "socket.io"
 
 /**
@@ -46,5 +47,16 @@ const onEvent = (socket=>{
     socket.join(roomId);
     //告诉前端人数
     socket.emit("people-count-msg",roomMap.get(roomId));
+    socket.to(roomId).emit("people-count-msg",roomMap.get(roomId));
+
+    socket.on('offer-sdp-msg', (offerSDP) => {
+        socket.to(roomId).emit("offer-sdp-msg", offerSDP)
+    })
+    socket.on('answer-sdp-msg', (answerSDP) => {
+        socket.to(roomId).emit("answer-sdp-msg", answerSDP)
+     })
+    socket.on('candidate-msg', (candidate) => {
+        socket.to(roomId).emit("candidate-msg", candidate)
+    })
 
 })

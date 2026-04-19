@@ -1,3 +1,4 @@
+import { createPeerConnection, createVideoEle, getLocalMediaStream, setLocalVideoStream, setRemoteVideoStream } from './utils/common.js'
 import {io} from './utils/socket.io.esm.min.js'
 
 const roomInput = document.querySelector("#roomId")
@@ -7,7 +8,13 @@ const stopBtn = document.querySelector('.stopBtn')
 const videoBtn = document.querySelector('.videoBtn');
 const screenBtn = document.querySelector('.screenBtn');
 
-let offerVideo = document.querySelector('.offerVideo');
+let offerVideo = document.querySelector('#offerVideo');
+
+let localStream = await getLocalMediaStream({
+    video:true,audio:true
+})
+
+setLocalVideoStream(offerVideo,localStream);
 
 //人数是否满
 let isRoomFull = false;
@@ -16,7 +23,14 @@ let roomId;
 let userId;
 //socket对象
 let client;
-let serverUrl = "wss://172.25.46.144:3000/"
+let serverUrl = "wss://172.25.49.56:3000/"
+//第一次加入
+let isInited = false;
+
+/**
+ * @type {RTCPeerConnection}
+ */
+let peer;
 
 startBtn.addEventListener("click",()=>{
     if(isRoomFull){
@@ -35,4 +49,84 @@ startBtn.addEventListener("click",()=>{
             }
         })
     }
+    client.on("connect",()=>{
+        console.log("Connection successful");
+    })
+    client.on("disconnect",()=>{
+        console.log("Connection disconnected");
+    })
+    client.on("error",()=>{
+        console.log("Connection error");
+    })
+    //有人加入创建peerconnection
+    client.on("people-count-msg",async (count)=>{
+        console.log("count",count);
+        if(count==1){
+            isInited = true;
+        }
+        peer = createPeerConnection();
+        localStream.getTracks().forEach(track=>{
+            peer.addTrack(track,localStream);
+        })
+        /**
+         * 
+         * @param {RTCPeerConnectionIceEvent} event 
+         */
+        peer.onicecandidate = event =>{
+            //媒体协商成功
+            if(event.candidate){
+                client.emit("candidate-msg",event.candidate);
+            }
+        }
+        /**
+         * 
+         * @param {RTCTrackEvent} event 
+         */
+        peer.ontrack = event =>{
+            //建立p2p成功
+            //获取对方音视频信息，设置给本地video
+            console.log("6. AB连接成功p2p");
+            let videoEle = createVideoEle(count);
+            setRemoteVideoStream(videoEle,event.track);
+
+        }
+        if(!isInited){
+            //b触发事件
+            let offerSDP = await peer.createOffer();
+            await peer.setLocalDescription(offerSDP);
+
+            console.log("B发送给A offerSDP");
+            client.emit("offer-sdp-msg",offerSDP);
+        }
+        isInited =true;
+    })
+    
+    client.on("room-full",()=>{
+        alert("当前房间人满了");
+        isRoomFull = true;
+        return
+    })
+    //a收到b的sdp
+    client.on("offer-sdp-msg",async(offerSDP)=>{
+        await peer.setRemoteDescription(offerSDP);
+        let answerSDP = await peer.createAnswer();
+        await peer.setLocalDescription(answerSDP);
+
+        console.log("A收到offerSDP,发送给B answerSDP");
+        //a 已经收到offer,需要吧answer发给b
+        client.emit("answer-sdp-msg",answerSDP);
+
+    })
+    //b收到answer，媒体协商完成
+    client.on("answer-sdp-msg",async(answerSDP)=>{
+        console.log("B收到answerSDP 媒体协商完成");
+        await peer.setRemoteDescription(answerSDP);
+    })
+
+    // 交换candiate信息
+    client.on('candidate-msg', async (candidate) => {
+        console.log("5.* 交换candidate信息");
+        await peer.addIceCandidate(candidate)
+    })
+
 })
