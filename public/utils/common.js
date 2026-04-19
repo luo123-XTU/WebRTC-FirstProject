@@ -34,6 +34,19 @@ export const setLocalVideoStream = async (ele, newStream) => {
   }
 }
 /**
+ * 获取本地共享屏幕数据流
+ * @param {MediaStreamConstraints} constraints 
+ */
+export const getLocalScreenMediaStream = async (constraints) => {
+  try {
+    let stream = await navigator.mediaDevices.getDisplayMedia(constraints)
+    return stream;
+  } catch (error) {
+    console.log("error", error);
+  }
+}
+
+/**
  * 
  * @param {HTMLVideoElement} ele 
  * @param {MediaStreamTrack} track 

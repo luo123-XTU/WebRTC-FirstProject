@@ -1,4 +1,4 @@
-import { createPeerConnection, createVideoEle, getLocalMediaStream, setLocalVideoStream, setRemoteVideoStream } from './utils/common.js'
+import { createPeerConnection, createVideoEle, getLocalMediaStream, getLocalScreenMediaStream, setLocalVideoStream, setRemoteVideoStream } from './utils/common.js'
 import {io} from './utils/socket.io.esm.min.js'
 
 const roomInput = document.querySelector("#roomId")
@@ -31,6 +31,9 @@ let isInited = false;
  * @type {RTCPeerConnection}
  */
 let peer;
+
+let isStopAudio = false;
+let isStopVideo = false;
 
 startBtn.addEventListener("click",()=>{
     if(isRoomFull){
@@ -129,4 +132,45 @@ startBtn.addEventListener("click",()=>{
         await peer.addIceCandidate(candidate)
     })
 
+})
+
+stopBtn.addEventListener("click",()=>{
+    console.log("点击了暂停");
+    if(peer){
+        isStopAudio = !isStopAudio;
+        isStopVideo = !isStopVideo;
+        peer.getSenders().find(sender => sender.track.kind === 'audio').track.enabled = !isStopAudio;
+        peer.getSenders().find(sender => sender.track.kind === 'video').track.enabled = !isStopVideo;
+
+    }
+})
+videoBtn.addEventListener("click",async()=>{
+    let newStream = await getLocalMediaStream({
+    video: {
+      cursor: 'always' | 'motion' | 'never',
+      displaySurface: 'application' | 'browser' | 'monitor' | 'window'
+    }
+    });
+    if (newStream) {
+        localStream = newStream;
+        setLocalVideoStream(offerVideo, localStream);
+        localStream.getVideoTracks().forEach(track => {
+        peer.getSenders().find(sender => sender.track.kind === 'video').replaceTrack(track);
+        })
+    }
+})
+screenBtn.addEventListener("click",async ()=>{
+    let newStream = await getLocalScreenMediaStream({
+    video: {
+      cursor: 'always' | 'motion' | 'never',
+      displaySurface: 'application' | 'browser' | 'monitor' | 'window'
+    }
+    });
+    if (newStream) {
+        localStream = newStream;
+        setLocalVideoStream(offerVideo, localStream);
+        localStream.getVideoTracks().forEach(track => {
+        peer.getSenders().find(sender => sender.track.kind === 'video').replaceTrack(track);
+        })
+    }
 })
